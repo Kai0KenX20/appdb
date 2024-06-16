@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          gem install bundler
+          gem install bundler -v 2.4.22
           bundle install
           bundle exec pod install
 
