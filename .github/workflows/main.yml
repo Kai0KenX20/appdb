@@ -23,25 +23,6 @@ jobs:
         with:
           xcode-version: '14.3.1'
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '2.7'
-
-      - name: Find Gemfile directory
-        id: find-gemfile
-        run: |
-          gemfile_dir=$(find . -name "Gemfile" -exec dirname {} \;)
-          echo "::set-output name=gemfile_dir::$gemfile_dir"
-        shell: bash
-
-      - name: Install dependencies
-        run: |
-          gem install bundler -v 2.4.22
-          bundle install
-          bundle exec pod install
-        working-directory: ${{ steps.find-gemfile.outputs.gemfile_dir }}
-
       - name: Build and archive the project
         run: |
           xcodebuild -workspace appdb.xcworkspace \
