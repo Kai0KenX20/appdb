@@ -161,6 +161,10 @@ enum ConfigurationParameters: String {
     case signingIdentityType = "params[signing_identity_type]"
     case enterpriseCertId = "params[enterprise_cert_id]"
     case optedOutFromEmails = "params[is_opted_out_from_emails]"
+    // Add any new configuration parameters introduced in API v1.7
+}
+
+    case optedOutFromEmails = "params[is_opted_out_from_emails]"
 }
 
 enum AdditionalInstallationParameters: String {
