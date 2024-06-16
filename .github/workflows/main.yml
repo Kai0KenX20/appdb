@@ -25,7 +25,7 @@ jobs:
 
       - name: Build and archive the project
         run: |
-          xcodebuild -workspace appdb.xcworkspace \
+          xcodebuild -project appdb.xcodeproj \
                       -scheme appdb \
                       -sdk iphoneos \
                       -configuration Release \
