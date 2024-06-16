@@ -161,15 +161,17 @@ enum ConfigurationParameters: String {
     case signingIdentityType = "params[signing_identity_type]"
     case enterpriseCertId = "params[enterprise_cert_id]"
     case optedOutFromEmails = "params[is_opted_out_from_emails]"
-    // Add any new configuration parameters introduced in API v1.7
-}
-
-    case optedOutFromEmails = "params[is_opted_out_from_emails]"
-}
-
 enum AdditionalInstallationParameters: String {
     case alongside = "enable_features[alongside]"
     case name = "enable_features[name]"
+    case inApp = "enable_features[inapp]"
+    case trainer = "enable_features[trainer]"
+    case removePlugins = "enable_features[remove_plugins]"
+    case pushNotifications = "enable_features[push]"
+    case injectDylibs = "enabled_features[inject_dylibs]"
+    // Add any new additional installation parameters introduced in API v1.7
+}
+
     case inApp = "enable_features[inapp]"
     case trainer = "enable_features[trainer]"
     case removePlugins = "enable_features[remove_plugins]"
