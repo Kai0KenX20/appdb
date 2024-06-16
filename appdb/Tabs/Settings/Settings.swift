@@ -129,34 +129,21 @@ class Settings: TableViewController {
 
         // Set delegates for view controllers that require one
         if let themeChooser = viewController as? ThemeChooser {
-            themeChooser.changedThemeDelegate = self
-        } else if let languageChooser = viewController as? LanguageChooser {
-            languageChooser.changedLanguageDelegate = self
-        }
+API.getLinkCode(success: {
+    API.getConfiguration(success: { [weak self] in
+        guard let self = self else { return }
+        self.refreshSources()
+    }, fail: { _ in })
+}, fail: { [weak self] error in
+    guard let self = self else { return }
 
-        // Show view controller
-        if Global.isIpad {
-            if (viewController is ThemeChooser || viewController is LanguageChooser || viewController is AdvancedOptions),
-               #available(iOS 13.0, *) {
-                self.navigationController?.pushViewController(viewController, animated: true)
-            } else {
-                let nav = DismissableModalNavController(rootViewController: viewController)
-                nav.modalPresentationStyle = .formSheet
-                self.navigationController?.present(nav, animated: true)
-            }
-        } else {
-            self.navigationController?.pushViewController(viewController, animated: true)
-        }
+    // Profile has been removed, so let's deauthorize the app as well
+    if error == "NO_DEVICE_LINKED" {
+        self.deauthorize()
     }
 
-    // Show contact developer options
-    func contactDeveloper(indexPath: IndexPath) {
-        let alertController = UIAlertController(title: nil, message: "Choose an option".localized(), preferredStyle: .actionSheet, adaptive: true)
-        alertController.addAction(UIAlertAction(title: "Cancel".localized(), style: .cancel))
-        alertController.addAction(UIAlertAction(title: "Email".localized(), style: .default) { _ in
-            self.selectEmail(indexPath: indexPath)
-        })
-        alertController.addAction(UIAlertAction(title: "Telegram", style: .default) { _ in
+    self.refreshSources()
+})
             self.openInSafari(Global.telegram)
         })
         alertController.addAction(UIAlertAction(title: "Buy me a coffee".localized(), style: .default) { _ in
