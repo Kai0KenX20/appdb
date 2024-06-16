@@ -30,14 +30,16 @@ jobs:
                       -sdk iphoneos \
                       -configuration Release \
                       -archivePath $PWD/build/appdb.xcarchive \
-                      clean archive
+                      clean archive \
+                      -allowProvisioningUpdates
 
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
                       -archivePath $PWD/build/appdb.xcarchive \
                       -exportPath $PWD/build \
-                      -exportOptionsPlist ExportOptions.plist
+                      -exportOptionsPlist ExportOptions.plist \
+                      -allowProvisioningUpdates
 
       - name: Upload IPA
         uses: actions/upload-artifact@v2
