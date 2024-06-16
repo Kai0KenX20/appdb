@@ -275,27 +275,22 @@ func openLink(rt: String, icon: String) {
             } else {
                 UIApplication.shared.open(url)
             }
-        } else if !cell.devId.isEmpty {
-            let vc = SeeAll(title: cell.devName, type: contentType, devId: cell.devId)
-            navigationController?.pushViewController(vc, animated: true)
+API.getRedirectionTicket(t: link.link) { [weak self] error, rt, wait in
+    guard let self = self else { return }
+    if let error = error {
+        Messages.shared.showError(message: error.prettified)
+    } else if let redirectionTicket = rt, let wait = wait {
+        if wait == 0 {
+            openLink(rt: redirectionTicket, icon: self.content.itemIconUrl)
+        } else {
+            Messages.shared.hideAll()
+            Messages.shared.showMinimal(message: "Waiting %@ seconds...".localizedFormat(String(wait)), iconStyle: .none, color: Color.darkMainTint, duration: .seconds(seconds: Double(wait)))
+            delay(Double(wait)) {
+                openLink(rt: redirectionTicket, icon: self.content.itemIconUrl)
+            }
         }
     }
-
-    // MARK: - Install app
-
-    @objc private func install(sender: RoundedButton) {
-        currentInstallButton = sender
-        actualInstall(sender: currentInstallButton!)
-    }
-
-    private func actualInstall(sender: RoundedButton) {
-        func setButtonTitle(_ text: String) {
-            sender.setTitle(text.localized().uppercased(), for: .normal)
-        }
-
-        if Preferences.deviceIsLinked {
-            setButtonTitle("Requesting...")
-
+}
             func install(_ additionalOptions: [AdditionalInstallationParameters: Any] = [:]) {
 
                 API.install(id: sender.linkId, type: self.contentType, additionalOptions: additionalOptions) { [weak self] error in
