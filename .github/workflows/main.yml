@@ -23,32 +23,6 @@ jobs:
         with:
           xcode-version: '14.3.1'
 
-      - name: Find .p12 file
-        id: find-p12
-        run: |
-          p12_file=$(find . -name "*.p12" | head -n 1)
-          echo "P12_FILE=$p12_file" >> $GITHUB_ENV
-
-      - name: Find provisioning profile
-        id: find-provisioning
-        run: |
-          provisioning_profile=$(find . -name "*.mobileprovision" | head -n 1)
-          echo "PROVISIONING_PROFILE=$provisioning_profile" >> $GITHUB_ENV
-
-      - name: Install Signing Certificate
-        run: |
-          security create-keychain -p actions build.keychain
-          security import "$P12_FILE" -t agg -k ~/Library/Keychains/build.keychain -P 123456 -A
-          security list-keychains -s ~/Library/Keychains/build.keychain
-          security default-keychain -s ~/Library/Keychains/build.keychain
-          security unlock-keychain -p actions ~/Library/Keychains/build.keychain
-          security set-key-partition-list -S apple-tool:,apple: -s -k actions ~/Library/Keychains/build.keychain
-
-      - name: Install Provisioning Profile
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp "$PROVISIONING_PROFILE" ~/Library/MobileDevice/Provisioning\ Profiles/
-
       - name: Build and archive the project
         run: |
           xcodebuild -project appdb.xcodeproj \
@@ -56,16 +30,14 @@ jobs:
                       -sdk iphoneos \
                       -configuration Release \
                       -archivePath $PWD/build/appdb.xcarchive \
-                      clean archive \
-                      -allowProvisioningUpdates
+                      clean archive
 
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
                       -archivePath $PWD/build/appdb.xcarchive \
                       -exportPath $PWD/build \
-                      -exportOptionsPlist ExportOptions.plist \
-                      -allowProvisioningUpdates
+                      -exportOptionsPlist ExportOptions.plist
 
       - name: Upload IPA
         uses: actions/upload-artifact@v2
