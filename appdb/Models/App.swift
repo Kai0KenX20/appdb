@@ -82,84 +82,85 @@ class App: Item {
     var clicksYear: Int = 0
     var clicksAll: Int = 0
 
-    override func mapping(map: Map) {
-        name <- map["name"]
-        id <- map["id"]
-        image <- map["image"]
-        bundleId <- map["bundle_id"]
-        version <- map["version"]
-        price <- map["price"]
-        updated <- map["added"]
-        genreId <- map["genre_id"]
-        artistId <- map["artist_id"]
-        description_ <- map["description"]
-        whatsnew <- map["whatsnew"]
-        screenshotsData <- map["screenshots"]
-        lastParseItunes <- map["last_parse_itunes"]
-        website <- map["pwebsite"]
-        support <- map["psupport"]
-        pname <- map["pname"]
+override func mapping(map: Map) {
+    name <- map["name"]
+    id <- map["id"]
+    image <- map["image"]
+    bundleId <- map["bundle_id"]
+    version <- map["version"]
+    price <- map["price"]
+    updated <- map["added"]
+    genreId <- map["genre_id"]
+    artistId <- map["artist_id"]
+    description_ <- map["description"]
+    whatsnew <- map["whatsnew"]
+    screenshotsData <- map["screenshots"]
+    lastParseItunes <- map["last_parse_itunes"]
+    website <- map["pwebsite"]
+    support <- map["psupport"]
+    pname <- map["pname"]
 
-        // Information
+    // Information
 
-        if let data = lastParseItunes.data(using: .utf8), let itunesParse = try? JSON(data: data) {
-            seller = itunesParse["seller"].stringValue
-            size = itunesParse["size"].stringValue
-            publisher = itunesParse["publisher"].stringValue
-            published = itunesParse["published"].stringValue
-            rated = itunesParse["censor_rating"].stringValue
-            compatibility = itunesParse["requirements"].stringValue
-            languages = itunesParse["languages"].stringValue
-            category = Category(name: itunesParse["genre"]["name"].stringValue, id: itunesParse["genre"]["id"].stringValue)
+    if let data = lastParseItunes.data(using: .utf8), let itunesParse = try? JSON(data: data) {
+        seller = itunesParse["seller"].stringValue
+        size = itunesParse["size"].stringValue
+        publisher = itunesParse["publisher"].stringValue
+        published = itunesParse["published"].stringValue
+        rated = itunesParse["censor_rating"].stringValue
+        compatibility = itunesParse["requirements"].stringValue
+        languages = itunesParse["languages"].stringValue
+        category = Category(name: itunesParse["genre"]["name"].stringValue, id: itunesParse["genre"]["id"].stringValue)
 
-            if languages.contains("Watch") { languages = "".localized() } /* dirty fix "Languages: Apple Watch: Yes" */
-            while published.hasPrefix(" ") { published = String(published.dropFirst()) }
+        if languages.contains("Watch") { languages = "".localized() } /* dirty fix "Languages: Apple Watch: Yes" */
+        while published.hasPrefix(" ") { published = String(published.dropFirst()) }
 
-            // Ratings
-            if !itunesParse["ratings"]["count"].stringValue.isEmpty {
-                let count = itunesParse["ratings"]["count"].intValue
-                numberOfRating = "(" + NumberFormatter.localizedString(from: NSNumber(value: count), number: .decimal) + ")"
-                numberOfStars = itunesParse["ratings"]["stars"].doubleValue
-            }
-        } else {
-            // Pulled app?
-
-            // Fix categories not showing for pulled apps
-            if let genre = Preferences.genres.first(where: { $0.category == "ios" && $0.id == genreId.description }) {
-                category = Category(name: genre.name, id: genre.id)
-            }
-            seller = pname
-            publisher = "© " + pname
+        // Ratings
+        if !itunesParse["ratings"]["count"].stringValue.isEmpty {
+            let count = itunesParse["ratings"]["count"].intValue
+            numberOfRating = "(" + NumberFormatter.localizedString(from: NSNumber(value: count), number: .decimal) + ")"
+            numberOfStars = itunesParse["ratings"]["stars"].doubleValue
         }
+    } else {
+        // Pulled app?
 
-        // Screenshots
-
-        if let data = screenshotsData.data(using: .utf8), let screenshotsParse = try? JSON(data: data) {
-            var tmpScreens = [Screenshot]()
-            for i in 0..<screenshotsParse["iphone"].count {
-                tmpScreens.append(Screenshot(
-                    src: screenshotsParse["iphone"][i]["src"].stringValue,
-                    class_: guessScreenshotOrientation(from: screenshotsParse["iphone"][i]["src"].stringValue),
-                    type: "iphone"
-                ))
-            }; screenshotsIphone = tmpScreens
-
-            var tmpScreensIpad = [Screenshot]()
-            for i in 0..<screenshotsParse["ipad"].count {
-                tmpScreensIpad.append(Screenshot(
-                    src: screenshotsParse["ipad"][i]["src"].stringValue,
-                    class_: guessScreenshotOrientation(from: screenshotsParse["ipad"][i]["src"].stringValue),
-                    type: "ipad"
-                ))
-            }; screenshotsIpad = tmpScreensIpad
+        // Fix categories not showing for pulled apps
+        if let genre = Preferences.genres.first(where: { $0.category == "ios" && $0.id == genreId.description }) {
+            category = Category(name: genre.name, id: genre.id)
         }
-
-        clicksDay <- map["clicks_day"]
-        clicksWeek <- map["clicks_week"]
-        clicksMonth <- map["clicks_month"]
-        clicksYear <- map["clicks_year"]
-        clicksAll <- map["clicks_all"]
+        seller = pname
+        publisher = "© " + pname
     }
+
+    // Screenshots
+
+    if let data = screenshotsData.data(using: .utf8), let screenshotsParse = try? JSON(data: data) {
+        var tmpScreens = [Screenshot]()
+        for i in 0..<screenshotsParse["iphone"].count {
+            tmpScreens.append(Screenshot(
+                src: screenshotsParse["iphone"][i]["src"].stringValue,
+                class_: guessScreenshotOrientation(from: screenshotsParse["iphone"][i]["src"].stringValue),
+                type: "iphone"
+            ))
+        }; screenshotsIphone = tmpScreens
+
+        var tmpScreensIpad = [Screenshot]()
+        for i in 0..<screenshotsParse["ipad"].count {
+            tmpScreensIpad.append(Screenshot(
+                src: screenshotsParse["ipad"][i]["src"].stringValue,
+                class_: guessScreenshotOrientation(from: screenshotsParse["ipad"][i]["src"].stringValue),
+                type: "ipad"
+            ))
+        }; screenshotsIpad = tmpScreensIpad
+    }
+
+    clicksDay <- map["clicks_day"]
+    clicksWeek <- map["clicks_week"]
+    clicksMonth <- map["clicks_month"]
+    clicksYear <- map["clicks_year"]
+    clicksAll <- map["clicks_all"]
+}
+
 
     // Detect screenshot orientation from URL string
     private func guessScreenshotOrientation(from absoluteUrl: String) -> String {
