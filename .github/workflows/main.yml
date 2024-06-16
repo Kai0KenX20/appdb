@@ -33,7 +33,7 @@ jobs:
           gem install bundler -v 2.4.22
           bundle install
           bundle exec pod install
-        working-directory: ./appdb # Update this path to the directory containing your Gemfile
+        working-directory: . # Adjust this path to the directory containing your Gemfile
 
       - name: Build and archive the project
         run: |
