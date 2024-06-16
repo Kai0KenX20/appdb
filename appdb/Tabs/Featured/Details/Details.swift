@@ -470,36 +470,32 @@ extension Details: RelatedRedirectionDelegate {
         let vc = Details(type: contentType, trackid: trackid)
         // navigationController?.navigationBar.isTranslucent = false /* God damnit, Apple */
         navigationController?.pushViewController(vc, animated: true)
+API.install(id: sender.linkId, type: self.contentType, additionalOptions: additionalOptions) { [weak self] error in
+    guard let self = self else { return }
+
+    if let error = error {
+        Messages.shared.showError(message: error.prettified, context: .viewController(self))
+        delay(0.3) {
+            setButtonTitle("Install")
+        }
+    } else {
+        setButtonTitle("Requested")
+
+        if #available(iOS 10.0, *) { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+
+        Messages.shared.showSuccess(message: "Installation has been queued to your device".localized(), context: .viewController(self))
+
+        if self.contentType != .books {
+            ObserveQueuedApps.shared.addApp(type: self.contentType, linkId: sender.linkId,
+                                            name: self.content.itemName, image: self.content.itemIconUrl,
+                                            bundleId: self.content.itemBundleId)
+        }
+
+        delay(5) {
+            setButtonTitle("Install")
+        }
     }
 }
-
-//
-// MARK: - ScreenshotRedirectionDelegate
-// Present Full screenshots view controller with given index
-//
-extension Details: ScreenshotRedirectionDelegate {
-    func screenshotImageSelected(with index: Int, _ allLandscape: Bool, _ mixedClasses: Bool, _ magic: CGFloat) {
-        let vc = DetailsFullScreenshots(content.itemScreenshots, index, allLandscape, mixedClasses, magic)
-        let nav = DetailsFullScreenshotsNavController(rootViewController: vc)
-        present(nav, animated: true)
-    }
-}
-
-//
-// MARK: - DynamicContentRedirection
-//   Push details controller given type and trackid
-//
-extension Details: DynamicContentRedirection {
-    func dynamicContentSelected(type: ItemType, id: String) {
-        let vc = Details(type: type, trackid: id)
-        navigationController?.pushViewController(vc, animated: true)
-    }
-}
-
-//
-// MARK: - DetailsHeaderDelegate
-// Push seeAll view controller when user taps seller button
-//
 extension Details: DetailsHeaderDelegate {
     func sellerSelected(title: String, type: ItemType, devId: String) {
         let vc = SeeAll(title: title, type: type, devId: devId)
