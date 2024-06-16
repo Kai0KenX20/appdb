@@ -149,6 +149,7 @@ enum Actions: String {
     case deleteDylib = "delete_dylib"
     case getEnterpriseCerts = "get_enterprise_certs"
 }
+}
 
 enum ConfigurationParameters: String {
     case appsync = "params[appsync]"
