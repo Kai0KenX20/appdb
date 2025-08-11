@@ -11,7 +11,7 @@ import SwiftyJSON
 import Localize_Swift
 
 enum API {
-    static let endpoint = "https://api.dbservices.to/v1.6/"
+    static let endpoint = "https://api.dbservices.to/v1.7/"
     static let statusEndpoint = "https://status.dbservices.to/API/v1.0/"
     static let itmsHelperEndpoint = "https://dbservices.to/manifest.php"
 
@@ -147,6 +147,9 @@ enum Actions: String {
     case addDylib = "add_dylib"
     case deleteDylib = "delete_dylib"
     case getEnterpriseCerts = "get_enterprise_certs"
+    case getOfficialApps = "get_official_apps"
+    case getRepoApps = "get_repo_apps"
+    case getUserApps = "get_user_apps"
 }
 
 enum ConfigurationParameters: String {
