@@ -1,0 +1,38 @@
+name: Build Unsigned IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+        with:
+          ref: maseter  # The branch you want to build from
+
+      - name: Clean and archive project (unsigned)
+        run: |
+          mkdir -p build
+          xcodebuild -project appdb.xcodeproj \
+                     -scheme appdb \
+                     -configuration Release \
+                     clean archive \
+                     -archivePath "$PWD/build/appdb.xcarchive" \
+                     CODE_SIGNING_ALLOWED=NO
+      - name: Create unsigned IPA manually
+        run: |
+          # Go to the .xcarchive products directory where the .app is located
+          cd build/appdb.xcarchive/Products/Applications
+          # Zip up the .app folder into a .ipa
+          zip -r appdb.zip appdb.app
+          mv appdb.zip appdb.ipa
+          # Move the .ipa back into the build folder
+          mv appdb.ipa "$GITHUB_WORKSPACE/build/appdb.ipa"
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4.6.1
+        with:
+          name: unsigned-ipa
+          path: build/appdb.ipa
