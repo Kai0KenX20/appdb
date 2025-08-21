@@ -1,4 +1,4 @@
-name: iOS Unsigned IPA (Debug)
+name: iOS Unsigned IPA (Debug, Auto-Detect)
 
 on:
   workflow_dispatch:
@@ -12,8 +12,6 @@ jobs:
       CONFIGURATION: Release
       BUILD_DIR: ${{ github.workspace }}/build
       OUT_DIR: ${{ github.workspace }}/unsigned_out
-      PROJECT_OR_WORKSPACE: appdb.xcodeproj
-      USE_WORKSPACE: "false"
 
     steps:
       - name: Checkout
@@ -21,67 +19,115 @@ jobs:
 
       - name: Select Xcode 15 (fallback ok)
         run: |
+          set -e
           XCODE="/Applications/Xcode_15.4.app"
           if [ -d "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
           xcodebuild -version
 
-      - name: Detect CocoaPods / workspace
+      - name: Locate project/workspace (auto-detect) + CocoaPods
         run: |
           set -e
-          if [ -f "Podfile" ] || [ -f "appdb/Podfile" ]; then
-            echo "CocoaPods detected."
+          ROOT="${{ github.workspace }}"
+          echo "Root: $ROOT"
+
+          # Prefer workspace (Pods), else project
+          FOUND_WS="$(find "$ROOT" -maxdepth 4 -type d -name "*.xcworkspace" | head -n 1)"
+          FOUND_PROJ="$(find "$ROOT" -maxdepth 4 -type d -name "*.xcodeproj" | head -n 1)"
+
+          if [ -n "$FOUND_WS" ]; then
+            PROJECT_OR_WORKSPACE="$FOUND_WS"
+            USE_WORKSPACE=true
+            PROJECT_DIR="$(dirname "$FOUND_WS")"
+          elif [ -n "$FOUND_PROJ" ]; then
+            PROJECT_OR_WORKSPACE="$FOUND_PROJ"
+            USE_WORKSPACE=false
+            PROJECT_DIR="$(dirname "$FOUND_PROJ")"
+          else
+            echo "No .xcworkspace or .xcodeproj found within 4 levels of $ROOT"; exit 1
+          fi
+
+          echo "PROJECT_OR_WORKSPACE=$PROJECT_OR_WORKSPACE" >> $GITHUB_ENV
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "USE_WORKSPACE=$USE_WORKSPACE" >> $GITHUB_ENV
+
+          # If a Podfile is present in project dir, install and switch to workspace
+          if [ -f "$PROJECT_DIR/Podfile" ]; then
+            echo "Podfile detected in $PROJECT_DIR — running pod install"
             sudo gem install cocoapods --no-document
-            POD_DIR="."
-            [ -f "appdb/Podfile" ] && POD_DIR="appdb"
-            (cd "$POD_DIR" && pod install)
-            echo "PROJECT_OR_WORKSPACE=$POD_DIR/appdb.xcworkspace" >> $GITHUB_ENV
-            echo "USE_WORKSPACE=true" >> $GITHUB_ENV
-          else
-            echo "No Podfile found; using .xcodeproj"
-            echo "PROJECT_OR_WORKSPACE=appdb.xcodeproj" >> $GITHUB_ENV
-            echo "USE_WORKSPACE=false" >> $GITHUB_ENV
+            (cd "$PROJECT_DIR" && pod install)
+            WS="$(find "$PROJECT_DIR" -maxdepth 1 -type d -name "*.xcworkspace" | head -n 1)"
+            if [ -n "$WS" ]; then
+              echo "Switching to workspace: $WS"
+              echo "PROJECT_OR_WORKSPACE=$WS" >> $GITHUB_ENV
+              echo "USE_WORKSPACE=true" >> $GITHUB_ENV
+            fi
           fi
 
-      - name: Build (no code signing)
+          echo "Resolved PROJECT_OR_WORKSPACE=$(cat $GITHUB_ENV | grep PROJECT_OR_WORKSPACE | tail -n1 | cut -d= -f2)"
+          echo "Resolved USE_WORKSPACE=$(cat $GITHUB_ENV | grep USE_WORKSPACE | tail -n1 | cut -d= -f2)"
+          echo "Resolved PROJECT_DIR=$(cat $GITHUB_ENV | grep PROJECT_DIR | tail -n1 | cut -d= -f2)"
+
+      - name: Show schemes & build settings (sanity)
         run: |
           set -e
-          mkdir -p "$BUILD_DIR"
-          if [ "$USE_WORKSPACE" = "true" ]; then
-            xcodebuild               -workspace "$PROJECT_OR_WORKSPACE"               -scheme "$SCHEME"               -configuration "$CONFIGURATION"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="$BUILD_DIR"               CONFIGURATION_BUILD_DIR="$BUILD_DIR/Release-iphoneos"               SUPPORTS_MACCATALYST=NO               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
+          if [ "${{ env.USE_WORKSPACE }}" = "true" ]; then
+            xcodebuild -workspace "${{ env.PROJECT_OR_WORKSPACE }}" -list
           else
-            xcodebuild               -project "$PROJECT_OR_WORKSPACE"               -scheme "$SCHEME"               -configuration "$CONFIGURATION"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="$BUILD_DIR"               CONFIGURATION_BUILD_DIR="$BUILD_DIR/Release-iphoneos"               SUPPORTS_MACCATALYST=NO               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
+            xcodebuild -project "${{ env.PROJECT_OR_WORKSPACE }}" -list
           fi
 
-      - name: Show built app bundle contents
-        run: |
-          APP_PATH=$(find "$BUILD_DIR/Release-iphoneos" -maxdepth 2 -type d -name "*.app" | head -n 1)
-          echo "APP_PATH=$APP_PATH"
-          if [ -z "$APP_PATH" ]; then exit 1; fi
-          ls -la "$APP_PATH"
-          if [ -f "$APP_PATH/Info.plist" ]; then
-            /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist" || true
-            /usr/libexec/PlistBuddy -c 'Print :CFBundlePackageType' "$APP_PATH/Info.plist" || true
+          # Print Info.plist location from build settings
+          if [ "${{ env.USE_WORKSPACE }}" = "true" ]; then
+            xcodebuild -workspace "${{ env.PROJECT_OR_WORKSPACE }}" -scheme "${{ env.SCHEME }}" -showBuildSettings | grep -E "INFOPLIST_FILE|PRODUCT_BUNDLE_IDENTIFIER" || true
           else
+            xcodebuild -project "${{ env.PROJECT_OR_WORKSPACE }}" -scheme "${{ env.SCHEME }}" -showBuildSettings | grep -E "INFOPLIST_FILE|PRODUCT_BUNDLE_IDENTIFIER" || true
+          fi
+
+      - name: Build for iOS device (no code signing)
+        run: |
+          set -e
+          mkdir -p "${{ env.BUILD_DIR }}"
+          if [ "${{ env.USE_WORKSPACE }}" = "true" ]; then
+            xcodebuild               -workspace "${{ env.PROJECT_OR_WORKSPACE }}"               -scheme "${{ env.SCHEME }}"               -configuration "${{ env.CONFIGURATION }}"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="${{ env.BUILD_DIR }}"               CONFIGURATION_BUILD_DIR="${{ env.BUILD_DIR }}/Release-iphoneos"               SUPPORTS_MACCATALYST=NO               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
+          else
+            xcodebuild               -project "${{ env.PROJECT_OR_WORKSPACE }}"               -scheme "${{ env.SCHEME }}"               -configuration "${{ env.CONFIGURATION }}"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="${{ env.BUILD_DIR }}"               CONFIGURATION_BUILD_DIR="${{ env.BUILD_DIR }}/Release-iphoneos"               SUPPORTS_MACCATALYST=NO               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
+          fi
+
+      - name: Verify Info.plist and bundle id
+        run: |
+          set -e
+          APP_PATH=$(find "${{ env.BUILD_DIR }}/Release-iphoneos" -maxdepth 2 -type d -name "*.app" | head -n 1)
+          echo "APP_PATH=$APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found in ${{ env.BUILD_DIR }}/Release-iphoneos"; exit 1
+          fi
+          ls -la "$APP_PATH"
+          if [ ! -f "$APP_PATH/Info.plist" ]; then
             echo "NO Info.plist FOUND in $APP_PATH"
+            echo "Build Settings (searching for INFOPLIST_FILE):"
+            ( [ "${{ env.USE_WORKSPACE }}" = "true" ] && xcodebuild -workspace "${{ env.PROJECT_OR_WORKSPACE }}" -scheme "${{ env.SCHEME }}" -showBuildSettings || xcodebuild -project "${{ env.PROJECT_OR_WORKSPACE }}" -scheme "${{ env.SCHEME }}" -showBuildSettings ) | grep INFOPLIST_FILE || true
             exit 1
           fi
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist" || true
+          /usr/libexec/PlistBuddy -c 'Print :CFBundlePackageType' "$APP_PATH/Info.plist" || true
 
       - name: Package unsigned IPA
         run: |
           set -e
-          mkdir -p "$OUT_DIR"
-          APP_PATH=$(find "$BUILD_DIR/Release-iphoneos" -maxdepth 2 -type d -name "*.app" | head -n 1)
-          WORK="$OUT_DIR/payloaddir"
+          mkdir -p "${{ env.OUT_DIR }}"
+          APP_PATH=$(find "${{ env.BUILD_DIR }}/Release-iphoneos" -maxdepth 2 -type d -name "*.app" | head -n 1)
+          WORK="${{ env.OUT_DIR }}/payloaddir"
           mkdir -p "$WORK/Payload"
           cp -R "$APP_PATH" "$WORK/Payload/"
+          # Strip signing remnants
           find "$WORK/Payload" -type d -name "_CodeSignature" -exec rm -rf {} + || true
           find "$WORK/Payload" -type f -name "embedded.mobileprovision" -delete || true
           cd "$WORK"
-          /usr/bin/zip -9 -r "../appdb-unsigned.ipa" Payload
-          ls -lah "$OUT_DIR"
+          /usr/bin/zip -9 -r "../app-unsigned.ipa" Payload
+          ls -lah "${{ env.OUT_DIR }}"
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: appdb-unsigned-ipa-debug
-          path: ${{ github.workspace }}/unsigned_out/appdb-unsigned.ipa
+          name: unsigned-ipa
+          path: ${{ github.workspace }}/unsigned_out/app-unsigned.ipa
