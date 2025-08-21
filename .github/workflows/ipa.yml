@@ -1,10 +1,10 @@
-name: iOS Unsigned IPA (appdb)
+name: iOS Unsigned IPA (Debug)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-unsigned:
+  build-unsigned-debug:
     runs-on: macos-14
 
     env:
@@ -12,7 +12,7 @@ jobs:
       CONFIGURATION: Release
       BUILD_DIR: ${{ github.workspace }}/build
       OUT_DIR: ${{ github.workspace }}/unsigned_out
-      PROJECT_OR_WORKSPACE: appdb.xcodeproj # will switch to workspace if a Podfile exists
+      PROJECT_OR_WORKSPACE: appdb.xcodeproj
       USE_WORKSPACE: "false"
 
     steps:
@@ -47,9 +47,23 @@ jobs:
           set -e
           mkdir -p "$BUILD_DIR"
           if [ "$USE_WORKSPACE" = "true" ]; then
-            xcodebuild               -workspace "$PROJECT_OR_WORKSPACE"               -scheme "$SCHEME"               -configuration "$CONFIGURATION"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="$BUILD_DIR"               CONFIGURATION_BUILD_DIR="$BUILD_DIR/Release-iphoneos"               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
+            xcodebuild               -workspace "$PROJECT_OR_WORKSPACE"               -scheme "$SCHEME"               -configuration "$CONFIGURATION"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="$BUILD_DIR"               CONFIGURATION_BUILD_DIR="$BUILD_DIR/Release-iphoneos"               SUPPORTS_MACCATALYST=NO               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
           else
-            xcodebuild               -project "$PROJECT_OR_WORKSPACE"               -scheme "$SCHEME"               -configuration "$CONFIGURATION"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="$BUILD_DIR"               CONFIGURATION_BUILD_DIR="$BUILD_DIR/Release-iphoneos"               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
+            xcodebuild               -project "$PROJECT_OR_WORKSPACE"               -scheme "$SCHEME"               -configuration "$CONFIGURATION"               -sdk iphoneos               -destination 'generic/platform=iOS'               BUILD_DIR="$BUILD_DIR"               CONFIGURATION_BUILD_DIR="$BUILD_DIR/Release-iphoneos"               SUPPORTS_MACCATALYST=NO               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""               clean build | xcpretty || exit 1
+          fi
+
+      - name: Show built app bundle contents
+        run: |
+          APP_PATH=$(find "$BUILD_DIR/Release-iphoneos" -maxdepth 2 -type d -name "*.app" | head -n 1)
+          echo "APP_PATH=$APP_PATH"
+          if [ -z "$APP_PATH" ]; then exit 1; fi
+          ls -la "$APP_PATH"
+          if [ -f "$APP_PATH/Info.plist" ]; then
+            /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist" || true
+            /usr/libexec/PlistBuddy -c 'Print :CFBundlePackageType' "$APP_PATH/Info.plist" || true
+          else
+            echo "NO Info.plist FOUND in $APP_PATH"
+            exit 1
           fi
 
       - name: Package unsigned IPA
@@ -57,28 +71,17 @@ jobs:
           set -e
           mkdir -p "$OUT_DIR"
           APP_PATH=$(find "$BUILD_DIR/Release-iphoneos" -maxdepth 2 -type d -name "*.app" | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "Could not find built .app in $BUILD_DIR/Release-iphoneos"; exit 1
-          fi
-          echo "Found app: $APP_PATH"
-
           WORK="$OUT_DIR/payloaddir"
           mkdir -p "$WORK/Payload"
           cp -R "$APP_PATH" "$WORK/Payload/"
-
-          # Strip signing artifacts to ensure truly unsigned
           find "$WORK/Payload" -type d -name "_CodeSignature" -exec rm -rf {} + || true
           find "$WORK/Payload" -type f -name "embedded.mobileprovision" -delete || true
-          find "$WORK/Payload" -type f -name "CodeResources" -delete || true
-          find "$WORK/Payload" -type f -name "ResourceRules.plist" -delete || true
-
           cd "$WORK"
           /usr/bin/zip -9 -r "../appdb-unsigned.ipa" Payload
-
           ls -lah "$OUT_DIR"
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: appdb-unsigned-ipa
+          name: appdb-unsigned-ipa-debug
           path: ${{ github.workspace }}/unsigned_out/appdb-unsigned.ipa
